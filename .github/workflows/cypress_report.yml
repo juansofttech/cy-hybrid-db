@@ -1,0 +1,74 @@
+name: CI Cy report and CD
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  cypress-e2e-api:
+    runs-on: ubuntu-latest
+    name: Run Cypress E2E Tests
+    container:
+      image: cypress/browsers:node16.16.0-chrome107-ff107
+    steps:
+      - name: Checkout code repository 📁
+        uses: actions/checkout@v3
+      - name: Install Cypress 💻
+        run: npm install cypress
+      - name: Install Percy 📈
+        run: npm install --save-dev @percy/cli
+      - name: Cache Cypress dependencies 💾
+        uses: actions/cache@v3
+        id: cache-cypress-deps
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-cypress-deps-${{ matrix.cypress }}
+      - name: Cache Cypress binary 💻
+        uses: actions/cache@v3
+        id: cache-cypress-binary
+        with:
+          path: ~/.cache/Cypress
+          key: ${{ runner.os }}-cypress-binary-${{ matrix.cypress }}
+      - name: Restore Cypress dependencies 💾
+        uses: actions/cache@v3
+        id: restore-cypress-deps
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-cypress-deps-${{ matrix.cypress }}
+      - name: Restore Cypress binary 💻
+        uses: actions/cache@v3
+        id: restore-cypress-binary
+        with:
+          path: ~/.cache/Cypress
+          key: ${{ runner.os }}-cypress-binary-${{ matrix.cypress }}
+      - name: Run Cypress tests 🚀
+        uses: cypress-io/github-action@v5
+        continue-on-error: true
+        with:
+          browser: chrome
+        env:
+          CYPRESS_ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+      - name: Run Percy 📊
+        run: |
+          npx percy snapshot --cypress-run
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+          CYPRESS_BASE_URL: https://percy.io/092c4373/cy-hybrid-db
+      - name: Run Code Analysis 🔍
+        uses: github/codeql-action/analyze@v2
+        with:
+          languages: 'javascript'
+          queries: 'security-extended'
+          format: 'html'
+          output: 'code-analysis-report.html'
+      - name: Merge test results into one 📊
+        run: npm run report:merge
+      - name: Generate HTML report 📄
+        run: npm run report:generate
+      - name: Publish report to GitHub Pages 📢
+        uses: peaceiris/actions-gh-pages@v3
+        if: ${{ github.ref == 'refs/heads/master' }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public

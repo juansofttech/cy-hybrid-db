@@ -1,0 +1,5 @@
+ 
+version: 2
+projects:
+  - name: cy-hybrid-db
+    url: https://percy.io/092c4373/cy-hybrid-db
